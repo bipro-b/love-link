@@ -7,8 +7,10 @@ plugins {
 android {
     namespace "com.lovelink.app"
     compileSdk flutter.compileSdkVersion
+    ndkVersion "28.2.13676358"
 
     compileOptions {
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
@@ -36,8 +38,17 @@ android {
             shrinkResources false
         }
     }
+
+    lint {
+        disable 'Instantiatable'
+        checkReleaseBuilds false
+    }
 }
 
 flutter {
     source "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
 }
