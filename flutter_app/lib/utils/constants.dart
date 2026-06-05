@@ -3,11 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 // ── Server config ─────────────────────────────────────────────────────────────
 class AppConfig {
-  // 🔧 REQUIRED: Set this to your Railway/Render server URL
-  // Deploy signaling_server/ to Railway: https://railway.app
-  // After deploy you get a URL like: https://lovelink-xxxx.railway.app
-  // Then change the line below to:  'https://your-app.railway.app'
-  static const String signalingServer = 'https://YOUR_RAILWAY_URL.railway.app';
+  static const String defaultServerHint = 'https://love-link-uw6m.onrender.com';
 
   // Fixed user IDs — one phone uses 'user1', other uses 'user2'
   static const String user1Id = 'user1';

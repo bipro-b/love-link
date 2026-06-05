@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as io;
-import '../utils/constants.dart';
 
 enum SignalingEvent {
   partnerOnline,
@@ -38,11 +37,11 @@ class SignalingService {
   String? get userId => _userId;
 
   // ── Connect & Register ────────────────────────────────────────────────────
-  Future<void> connect(String userId) async {
+  Future<void> connect(String userId, String serverUrl) async {
     _userId = userId;
 
     _socket = io.io(
-      AppConfig.signalingServer,
+      serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
           .setReconnectionAttempts(10)

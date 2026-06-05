@@ -52,10 +52,10 @@ class CallProvider extends ChangeNotifier {
   bool get showChat => _showChat;
 
   // ── Initialize ────────────────────────────────────────────────────────────
-  Future<void> initialize(String userId) async {
+  Future<void> initialize(String userId, String serverUrl) async {
     await _webRTC.initialize();
     await _notif.initialize();
-    await _signaling.connect(userId);
+    await _signaling.connect(userId, serverUrl);
     _listenToSignaling();
   }
 

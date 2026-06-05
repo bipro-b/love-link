@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/call_provider.dart';
 import '../utils/constants.dart';
 import 'incoming_call_screen.dart';
 import 'video_call_screen.dart';
 import 'audio_call_screen.dart';
+import 'setup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userId;
-  const HomeScreen({super.key, required this.userId});
+  final String serverUrl;
+  const HomeScreen({super.key, required this.userId, required this.serverUrl});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -21,7 +24,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<CallProvider>().initialize(widget.userId);
+      context.read<CallProvider>().initialize(widget.userId, widget.serverUrl);
     });
   }
 
@@ -107,6 +110,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 class _TopBar extends StatelessWidget {
   final String userId;
   const _TopBar({required this.userId});
+
+  Future<void> _resetSetup(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.card,
+        title: Text('Reset Setup', style: GoogleFonts.dmSans(color: AppColors.text)),
+        content: Text('Clear server URL and user selection?',
+          style: GoogleFonts.dmSans(color: AppColors.muted)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: GoogleFonts.dmSans(color: AppColors.muted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Reset', style: GoogleFonts.dmSans(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && context.mounted) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const SetupScreen()),
+          (_) => false,
+        );
+      }
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -133,7 +168,7 @@ class _TopBar extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.settings_outlined, color: AppColors.muted, size: 20),
-            onPressed: () {},
+            onPressed: () => _resetSetup(context),
           ),
         ],
       ),

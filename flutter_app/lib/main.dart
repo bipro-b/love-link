@@ -11,13 +11,11 @@ import 'utils/constants.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Force portrait
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Immersive UI
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -25,13 +23,18 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final savedUserId = prefs.getString('userId');
+  final savedServer = prefs.getString('serverUrl');
 
-  runApp(LoveLinkApp(initialUserId: savedUserId));
+  runApp(LoveLinkApp(
+    initialUserId: savedUserId,
+    serverUrl: savedServer,
+  ));
 }
 
 class LoveLinkApp extends StatelessWidget {
   final String? initialUserId;
-  const LoveLinkApp({super.key, this.initialUserId});
+  final String? serverUrl;
+  const LoveLinkApp({super.key, this.initialUserId, this.serverUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -41,8 +44,8 @@ class LoveLinkApp extends StatelessWidget {
         title: 'LoveLink',
         debugShowCheckedModeBanner: false,
         theme: buildAppTheme(),
-        home: initialUserId != null
-            ? HomeScreen(userId: initialUserId!)
+        home: (initialUserId != null && serverUrl != null)
+            ? HomeScreen(userId: initialUserId!, serverUrl: serverUrl!)
             : const SetupScreen(),
       ),
     );
