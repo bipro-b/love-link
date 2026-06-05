@@ -1,0 +1,43 @@
+name: lovelink
+description: LoveLink - Private video & audio call app for two
+
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # WebRTC
+  flutter_webrtc: ^0.9.47
+
+  # Socket.io signaling
+  socket_io_client: ^2.0.3+1
+
+  # Notifications & audio
+  flutter_local_notifications: ^17.1.2
+  audioplayers: ^6.0.0
+
+  # Permissions
+  permission_handler: ^11.3.0
+
+  # State management
+  provider: ^6.1.2
+
+  # Shared preferences (store userId)
+  shared_preferences: ^2.2.3
+
+  # Wakelock (keep screen on during call)
+  wakelock_plus: ^1.1.4
+
+  # UI
+  google_fonts: ^6.2.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/sounds/ringtone.mp3
+    - assets/sounds/ringback.mp3
