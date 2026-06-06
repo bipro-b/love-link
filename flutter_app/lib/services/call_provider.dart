@@ -28,6 +28,7 @@ class CallProvider extends ChangeNotifier {
 
   // State
   CallState  _callState       = CallState.idle;
+  bool       _serverConnected = false;
   bool       _partnerOnline   = false;
   bool       _isVideoCall     = false;
   String     _callDuration    = '00:00';
@@ -38,8 +39,9 @@ class CallProvider extends ChangeNotifier {
   bool       _showChat        = false;
 
   // Getters
-  CallState  get callState      => _callState;
-  bool       get partnerOnline  => _partnerOnline;
+  CallState  get callState        => _callState;
+  bool       get serverConnected  => _serverConnected;
+  bool       get partnerOnline    => _partnerOnline;
   bool       get isVideoCall    => _isVideoCall;
   String     get callDuration   => _callDuration;
   bool       get isMuted        => _webRTC.isMuted;
@@ -66,6 +68,17 @@ class CallProvider extends ChangeNotifier {
       final data = event.values.first;
 
       switch (type) {
+        case SignalingEvent.serverConnected:
+          _serverConnected = true;
+          notifyListeners();
+          break;
+
+        case SignalingEvent.serverDisconnected:
+          _serverConnected = false;
+          _partnerOnline = false;
+          notifyListeners();
+          break;
+
         case SignalingEvent.partnerOnline:
           _partnerOnline = true;
           notifyListeners();

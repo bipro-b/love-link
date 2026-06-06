@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/call_provider.dart';
+import '../services/update_service.dart';
 import '../utils/constants.dart';
 import 'incoming_call_screen.dart';
 import 'video_call_screen.dart';
@@ -19,13 +20,33 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  CallState _lastNavState = CallState.idle;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CallProvider>().initialize(widget.userId, widget.serverUrl);
+      _checkForUpdate();
     });
+  }
+
+  Future<void> _checkForUpdate() async {
+    await Future.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+    final info = await UpdateService.checkForUpdate();
+    if (info != null && mounted) {
+      _showUpdateDialog(info);
+    }
+  }
+
+  void _showUpdateDialog(UpdateInfo info) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _UpdateDialog(info: info),
+    );
   }
 
   @override
@@ -62,7 +83,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       onAudioCall: () => provider.startCall(isVideo: false),
                     ),
                     const Spacer(),
-                    _PartnerStatusBar(isOnline: provider.partnerOnline),
+                    _PartnerStatusBar(
+                      isOnline: provider.partnerOnline,
+                      serverConnected: provider.serverConnected,
+                    ),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -75,11 +99,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   void _handleCallStateNavigation(BuildContext context, CallProvider provider) {
-    switch (provider.callState) {
+    final state = provider.callState;
+    // Treat outgoingCall and inCall as the same nav state to avoid double-push
+    final navState = (state == CallState.outgoingCall || state == CallState.inCall)
+        ? CallState.inCall
+        : state;
+
+    if (navState == _lastNavState) return;
+    _lastNavState = navState;
+
+    switch (state) {
       case CallState.incomingCall:
-        Navigator.of(context).push(
-          _slideRoute(const IncomingCallScreen()),
-        );
+        Navigator.of(context).push(_slideRoute(const IncomingCallScreen()));
         break;
       case CallState.outgoingCall:
       case CallState.inCall:
@@ -90,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
         break;
       case CallState.idle:
+        Navigator.of(context).popUntil((r) => r.isFirst);
         break;
     }
   }
@@ -399,10 +431,25 @@ class _CallButtonState extends State<_CallButton> with SingleTickerProviderState
 
 class _PartnerStatusBar extends StatelessWidget {
   final bool isOnline;
-  const _PartnerStatusBar({required this.isOnline});
+  final bool serverConnected;
+  const _PartnerStatusBar({required this.isOnline, required this.serverConnected});
 
   @override
   Widget build(BuildContext context) {
+    final Color dotColor;
+    final String message;
+
+    if (!serverConnected) {
+      dotColor = AppColors.gold;
+      message = 'Connecting to server...';
+    } else if (isOnline) {
+      dotColor = AppColors.success;
+      message = "She's online · ready to call";
+    } else {
+      dotColor = AppColors.muted;
+      message = 'Waiting for her to come online...';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       decoration: BoxDecoration(
@@ -417,13 +464,15 @@ class _PartnerStatusBar extends StatelessWidget {
             width: 8, height: 8,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isOnline ? AppColors.success : AppColors.muted,
-              boxShadow: isOnline ? [BoxShadow(color: AppColors.success.withOpacity(.6), blurRadius: 6)] : [],
+              color: dotColor,
+              boxShadow: isOnline && serverConnected
+                  ? [BoxShadow(color: AppColors.success.withOpacity(.6), blurRadius: 6)]
+                  : [],
             ),
           ),
           const SizedBox(width: 8),
           Text(
-            isOnline ? 'She\'s online · ready to call' : 'Waiting for her to come online...',
+            message,
             style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.muted, letterSpacing: .5),
           ),
         ],
@@ -455,4 +504,154 @@ class _GlowCircle extends StatelessWidget {
       gradient: RadialGradient(colors: [color.withOpacity(opacity), Colors.transparent]),
     ),
   );
+}
+
+// ── Update dialog ──────────────────────────────────────────────────────────────
+
+class _UpdateDialog extends StatefulWidget {
+  final UpdateInfo info;
+  const _UpdateDialog({required this.info});
+  @override
+  State<_UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<_UpdateDialog> {
+  _Phase _phase = _Phase.idle;
+  double _progress = 0;
+
+  Future<void> _startUpdate() async {
+    setState(() { _phase = _Phase.downloading; _progress = 0; });
+    await UpdateService.downloadAndInstall(
+      widget.info,
+      onProgress: (p) { if (mounted) setState(() => _progress = p); },
+      onDone: (err) {
+        if (!mounted) return;
+        if (err != null) {
+          setState(() { _phase = _Phase.error; });
+        }
+        // On success Android installer takes over — dialog stays until user acts
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(colors: [AppColors.rose, Color(0xFFC2185B)]),
+                boxShadow: [BoxShadow(color: AppColors.rose.withOpacity(.4), blurRadius: 20)],
+              ),
+              child: const Center(child: Text('↑', style: TextStyle(fontSize: 24, color: Colors.white))),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Update Available',
+              style: GoogleFonts.cormorantGaramond(
+                fontSize: 22, color: AppColors.text, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'v${widget.info.version}',
+              style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.rose),
+            ),
+            if (widget.info.releaseNotes.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                widget.info.releaseNotes,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.dmSans(fontSize: 13, color: AppColors.muted),
+              ),
+            ],
+            const SizedBox(height: 24),
+            if (_phase == _Phase.downloading) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  value: _progress,
+                  minHeight: 6,
+                  backgroundColor: AppColors.deep,
+                  valueColor: const AlwaysStoppedAnimation(AppColors.rose),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '${(_progress * 100).toStringAsFixed(0)}% — downloading...',
+                style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.muted),
+              ),
+            ] else if (_phase == _Phase.error) ...[
+              Text(
+                'Install failed. Try again.',
+                style: GoogleFonts.dmSans(fontSize: 12, color: AppColors.danger),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _DialogBtn(label: 'Cancel', muted: true, onTap: () => Navigator.pop(context))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _DialogBtn(label: 'Retry', onTap: _startUpdate)),
+                ],
+              ),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(child: _DialogBtn(label: 'Later', muted: true, onTap: () => Navigator.pop(context))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _DialogBtn(label: 'Update Now', onTap: _startUpdate)),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _Phase { idle, downloading, error }
+
+class _DialogBtn extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final bool muted;
+  const _DialogBtn({required this.label, required this.onTap, this.muted = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 44,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: muted
+              ? null
+              : const LinearGradient(colors: [AppColors.rose, Color(0xFFC2185B)]),
+          color: muted ? AppColors.deep : null,
+          border: muted ? Border.all(color: AppColors.muted.withOpacity(.3)) : null,
+          boxShadow: muted
+              ? []
+              : [BoxShadow(color: AppColors.rose.withOpacity(.35), blurRadius: 12, offset: const Offset(0, 4))],
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: GoogleFonts.dmSans(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: muted ? AppColors.muted : Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
 }

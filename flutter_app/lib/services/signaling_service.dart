@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 enum SignalingEvent {
+  serverConnected,
+  serverDisconnected,
   partnerOnline,
   partnerOffline,
   incomingCall,
@@ -44,8 +46,8 @@ class SignalingService {
       serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket'])
-          .setReconnectionAttempts(10)
           .setReconnectionDelay(2000)
+          .setReconnectionDelayMax(10000)
           .enableAutoConnect()
           .build(),
     );
@@ -53,9 +55,13 @@ class SignalingService {
     _socket.onConnect((_) {
       _isConnected = true;
       _socket.emit('register', {'userId': userId});
+      _emit(SignalingEvent.serverConnected, null);
     });
 
-    _socket.onDisconnect((_) => _isConnected = false);
+    _socket.onDisconnect((_) {
+      _isConnected = false;
+      _emit(SignalingEvent.serverDisconnected, null);
+    });
 
     _socket.on('partner_status', (data) {
       final online = data['online'] as bool;

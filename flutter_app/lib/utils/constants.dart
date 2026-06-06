@@ -5,21 +5,23 @@ import 'package:google_fonts/google_fonts.dart';
 class AppConfig {
   static const String defaultServerHint = 'https://love-link-uw6m.onrender.com';
 
-  // Fixed user IDs — one phone uses 'user1', other uses 'user2'
   static const String user1Id = 'user1';
   static const String user2Id = 'user2';
 
-  // STUN/TURN servers for WebRTC NAT traversal
-  static const Map<String, dynamic> iceServers = {
+  // Metered.ca TURN — secret key auto-generates fresh credential before every call
+  static const String meteredDomain    = 'bipro.metered.live';
+  static const String meteredSecretKey = 'uA9lSaqjs9CjLzCeVkvt7la3hF9cxvaRr1Py8dEarU7b91Kw';
+
+  // In-app update — host a version.json at any public URL and paste the raw link here.
+  // Format: {"version":"1.0.1","build_number":2,"apk_url":"https://...","release_notes":"..."}
+  // Leave empty to disable update checks.
+  static const String updateCheckUrl = '';
+
+  // Fallback STUN-only if Metered API fails
+  static const Map<String, dynamic> iceServersFallback = {
     'iceServers': [
       {'urls': 'stun:stun.l.google.com:19302'},
       {'urls': 'stun:stun1.l.google.com:19302'},
-      // Add your TURN server here for reliability behind strict NATs:
-      // {
-      //   'urls': 'turn:YOUR_TURN_SERVER:3478',
-      //   'username': 'user',
-      //   'credential': 'pass',
-      // },
     ]
   };
 }

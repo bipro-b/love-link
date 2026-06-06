@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../utils/constants.dart';
@@ -34,9 +36,43 @@ class WebRTCService extends ChangeNotifier {
     await remoteRenderer.initialize();
   }
 
+  // ── Auto-generate fresh TURN credential before every call
+  Future<Map<String, dynamic>> _getIceConfig() async {
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 8);
+
+      // Step 1: Create fresh 4-hour credential using secret key
+      final createUri = Uri.https(AppConfig.meteredDomain,
+          '/api/v1/turn/credential', {'secretKey': AppConfig.meteredSecretKey});
+      final createReq = await client.postUrl(createUri);
+      createReq.headers.set('Content-Type', 'application/json');
+      createReq.write(jsonEncode({'expiryInSeconds': 14400, 'label': 'lovelink'}));
+      final createRes = await createReq.close();
+      if (createRes.statusCode != 200) throw Exception('create failed: ${createRes.statusCode}');
+      final createBody = await createRes.transform(utf8.decoder).join();
+      final String apiKey = jsonDecode(createBody)['apiKey'] as String;
+
+      // Step 2: Fetch ICE servers with the new apiKey
+      final getUri = Uri.https(AppConfig.meteredDomain,
+          '/api/v1/turn/credentials', {'apiKey': apiKey});
+      final getReq = await client.getUrl(getUri);
+      final getRes = await getReq.close();
+      if (getRes.statusCode != 200) throw Exception('fetch failed: ${getRes.statusCode}');
+      final getBody = await getRes.transform(utf8.decoder).join();
+      final List<dynamic> servers = jsonDecode(getBody);
+      debugPrint('Metered TURN: ${servers.length} servers, fresh 4h credential');
+      return {'iceServers': servers};
+    } catch (e) {
+      debugPrint('Metered failed, STUN fallback: $e');
+    }
+    return AppConfig.iceServersFallback;
+  }
+
   // ── Create peer connection ─────────────────────────────────────────────────
   Future<RTCPeerConnection> _createPeerConnection() async {
-    final pc = await createPeerConnection(AppConfig.iceServers);
+    final iceConfig = await _getIceConfig();
+    final pc = await createPeerConnection(iceConfig);
 
     pc.onIceCandidate = (candidate) {
       _signaling.sendIceCandidate(candidate.toMap());

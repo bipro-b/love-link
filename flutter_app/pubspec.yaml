@@ -30,6 +30,12 @@ dependencies:
   # Shared preferences (store userId)
   shared_preferences: ^2.2.3
 
+  # In-app update
+  package_info_plus: ^8.0.0
+  dio: ^5.7.0
+  open_filex: ^4.7.0
+  path_provider: ^2.1.4
+
   # Wakelock (keep screen on during call)
   wakelock_plus: ^1.1.4
 
